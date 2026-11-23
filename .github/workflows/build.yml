@@ -1,4 +1,4 @@
-name: Build APK
+name: APK 빌드
 
 on:
   push:
@@ -9,6 +9,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: 프로젝트 위치 찾기 (zip이 있으면 자동으로 압축 해제)
+        id: find
+        run: |
+          for z in *.zip; do
+            if [ -f "$z" ]; then unzip -oq "$z" -d _src; fi
+          done
+          S=$(find . -name settings.gradle.kts -not -path "./.git/*" | head -1)
+          if [ -z "$S" ]; then
+            echo "settings.gradle.kts 를 찾지 못했습니다. 저장소 파일 목록:"
+            find . -not -path "./.git/*" | head -50
+            exit 1
+          fi
+          D=$(dirname "$S")
+          echo "프로젝트 위치: $D"
+          echo "dir=$D" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
         with:
@@ -21,10 +37,11 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Build debug APK
+      - name: APK 만들기
+        working-directory: ${{ steps.find.outputs.dir }}
         run: gradle assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
           name: SmsForward-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: ${{ steps.find.outputs.dir }}/app/build/outputs/apk/debug/*.apk
